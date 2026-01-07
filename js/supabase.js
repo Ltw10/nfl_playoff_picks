@@ -27,6 +27,19 @@ const getAllUsers = async () => {
     return data;
 };
 
+// Find user by first and last name
+const findUserByName = async (firstName, lastName) => {
+    const { data, error } = await supabase
+        .from('nfl_playoff_users')
+        .select('*')
+        .eq('first_name', firstName)
+        .eq('last_name', lastName)
+        .maybeSingle();
+    
+    if (error) throw error;
+    return data;
+};
+
 // Get all games
 const getAllGames = async () => {
     const { data, error } = await supabase

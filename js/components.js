@@ -17,11 +17,21 @@ const SignUp = ({ onSignUp }) => {
     setError("");
 
     try {
-      const user = await createUser(firstName, lastName);
-      storeUser(user);
-      onSignUp(user);
+      // First, check if a user with this name already exists
+      const existingUser = await findUserByName(firstName, lastName);
+
+      if (existingUser) {
+        // User exists, log them in
+        storeUser(existingUser);
+        onSignUp(existingUser);
+      } else {
+        // User doesn't exist, create a new account
+        const user = await createUser(firstName, lastName);
+        storeUser(user);
+        onSignUp(user);
+      }
     } catch (err) {
-      setError(err.message || "Failed to create user");
+      setError(err.message || "Failed to sign in");
     } finally {
       setLoading(false);
     }
@@ -34,7 +44,7 @@ const SignUp = ({ onSignUp }) => {
           Williams NFL Playoff Picks
         </h1>
         <p className="text-center text-gray-600 mb-6">
-          Join the family competition!
+          Sign in or join the family competition!
         </p>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
@@ -73,7 +83,7 @@ const SignUp = ({ onSignUp }) => {
             disabled={loading}
             className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50"
           >
-            {loading ? "Creating Account..." : "Join Competition"}
+            {loading ? "Signing in..." : "Sign In / Join"}
           </button>
         </form>
       </div>
