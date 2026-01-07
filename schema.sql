@@ -21,6 +21,10 @@ CREATE TABLE nfl_playoff_games (
   away_score INTEGER DEFAULT 0,
   winner TEXT,                      -- NULL until game completes
   playoff_round TEXT,               -- 'wild_card', 'divisional', 'conference', 'super_bowl'
+  home_logo TEXT,                   -- URL to home team logo
+  away_logo TEXT,                   -- URL to away team logo
+  home_record TEXT,                 -- Home team record (e.g., '12-5')
+  away_record TEXT,                 -- Away team record (e.g., '11-6')
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

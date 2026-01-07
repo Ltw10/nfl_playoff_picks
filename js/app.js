@@ -1,20 +1,21 @@
 // ============================================
 // MAIN APP COMPONENT
 // ============================================
-
-const { useState, useEffect, useCallback } = React;
+// Using React hooks directly to avoid redeclaration errors
+// when scripts are loaded multiple times
 
 // Main App Component
 const App = () => {
-    const [currentUser, setCurrentUser] = useState(null);
-    const [view, setView] = useState('picks'); // 'picks' or 'leaderboard'
-    const [games, setGames] = useState([]);
-    const [users, setUsers] = useState([]);
-    const [picks, setPicks] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [currentUser, setCurrentUser] = React.useState(null);
+    const [view, setView] = React.useState('picks'); // 'picks', 'leaderboard', or 'userPicks'
+    const [viewingUserId, setViewingUserId] = React.useState(null);
+    const [games, setGames] = React.useState([]);
+    const [users, setUsers] = React.useState([]);
+    const [picks, setPicks] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
 
     // Load user from localStorage on mount
-    useEffect(() => {
+    React.useEffect(() => {
         const storedUser = getStoredUser();
         if (storedUser) {
             setCurrentUser(storedUser);
@@ -22,7 +23,7 @@ const App = () => {
     }, []);
 
     // Fetch all data
-    const fetchAllData = useCallback(async () => {
+    const fetchAllData = React.useCallback(async () => {
         if (!currentUser) return;
 
         setLoading(true);
@@ -42,17 +43,17 @@ const App = () => {
             // 1. No games in DB (initial setup)
             // 2. There are in-progress games (need live scores)
             // 3. There are scheduled games that might have started
+            // 4. Always sync on first load to get all playoff weeks
             const inProgressGames = gamesData.filter(g => g.status === 'in_progress');
             const scheduledGames = gamesData.filter(g => g.status === 'scheduled' && hasGameStarted(g.game_time));
             
-            if (gamesData.length === 0 || inProgressGames.length > 0 || scheduledGames.length > 0) {
-                // Sync games (will only update games that need updating)
-                await syncGames(gamesData);
-                
-                // Refetch games after sync
-                const updatedGames = await getAllGames();
-                setGames(updatedGames);
-            }
+            // Always sync to get all playoff weeks (Wild Card, Divisional, Conference, Super Bowl)
+            // The sync function will only update games that need updating
+            await syncGames(gamesData);
+            
+            // Refetch games after sync
+            const updatedGames = await getAllGames();
+            setGames(updatedGames);
         } catch (error) {
             console.error('Error fetching data:', error);
         } finally {
@@ -61,7 +62,7 @@ const App = () => {
     }, [currentUser]);
 
     // Fetch data when user is set
-    useEffect(() => {
+    React.useEffect(() => {
         fetchAllData();
     }, [fetchAllData]);
 
@@ -78,17 +79,38 @@ const App = () => {
     };
 
     const handlePick = async (gameId, pickedTeam) => {
+        // This is now handled locally in GamesList component
+        // Picks are saved via handleSaveRound
+    };
+
+    const handleSaveRound = async (picksToSave) => {
         if (!currentUser) return;
 
         try {
-            await upsertPick(currentUser.id, gameId, pickedTeam);
-            // Refresh picks
+            // Save all picks for this round
+            await Promise.all(
+                picksToSave.map(({ gameId, pickedTeam }) =>
+                    upsertPick(currentUser.id, gameId, pickedTeam)
+                )
+            );
+            
+            // Refresh picks after saving
             const updatedPicks = await getAllPicks();
             setPicks(updatedPicks);
         } catch (error) {
-            console.error('Error submitting pick:', error);
-            alert('Failed to submit pick. Please try again.');
+            console.error('Error saving picks:', error);
+            throw error; // Re-throw so GamesList can handle it
         }
+    };
+
+    const handleViewUser = (userId) => {
+        setViewingUserId(userId);
+        setView('userPicks');
+    };
+
+    const handleBackToLeaderboard = () => {
+        setViewingUserId(null);
+        setView('leaderboard');
     };
 
     if (!currentUser) {
@@ -155,7 +177,16 @@ const App = () => {
                         picks={picks}
                         currentUser={currentUser}
                         onPick={handlePick}
+                        onSaveRound={handleSaveRound}
                         loading={loading}
+                    />
+                ) : view === 'userPicks' ? (
+                    <UserPicksView
+                        userId={viewingUserId}
+                        users={users}
+                        games={games}
+                        picks={picks}
+                        onBack={handleBackToLeaderboard}
                     />
                 ) : (
                     <Leaderboard
@@ -163,6 +194,7 @@ const App = () => {
                         games={games}
                         picks={picks}
                         currentUser={currentUser}
+                        onViewUser={handleViewUser}
                     />
                 )}
             </main>
@@ -170,9 +202,35 @@ const App = () => {
     );
 };
 
-// Initialize the app when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-});
+// Initialize the app
+// Since scripts load asynchronously, DOM is likely already ready
+// But we'll check to be safe
+function initApp() {
+    const rootElement = document.getElementById('root');
+    if (!rootElement) {
+        console.error('Root element not found!');
+        return;
+    }
+    
+    try {
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+        console.log('✅ App rendered successfully!');
+    } catch (error) {
+        console.error('❌ Error rendering app:', error);
+        rootElement.innerHTML = 
+            '<div style="padding: 20px; text-align: center; color: red;">' +
+            '<h2>Error Rendering App</h2>' +
+            '<p>' + error.message + '</p>' +
+            '</div>';
+    }
+}
+
+// Try to initialize immediately, or wait for DOM if needed
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    // DOM is already ready
+    initApp();
+}
 

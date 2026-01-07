@@ -17,6 +17,16 @@ A simple family competition website where you can pick NFL playoff game winners 
 - **External API**: ESPN API (free, no key required)
 - **Hosting**: GitHub Pages
 
+## Quick Start (Local Testing)
+
+1. **Set up Supabase** (see detailed instructions below)
+2. **Run local server**:
+   ```bash
+   python3 -m http.server 8000
+   ```
+3. **Open browser**: `http://localhost:8000`
+4. **Add test data** (optional): Run `test-data.sql` in Supabase SQL Editor
+
 ## Setup Instructions
 
 ### 1. Create Supabase Project
@@ -31,7 +41,7 @@ A simple family competition website where you can pick NFL playoff game winners 
 2. Run the SQL script from `schema.sql`
 
 **Note:** Tables are prefixed with `nfl_playoff_` to distinguish from other projects in the same database:
-- `nfl_playoff_games` - Stores NFL playoff game information
+- `nfl_playoff_games` - Stores NFL playoff game information (includes team logos and records)
 - `nfl_playoff_users` - Stores user accounts for the competition
 - `nfl_playoff_picks` - Stores user picks for each game
 
@@ -39,6 +49,14 @@ The schema includes:
 - All three tables with proper foreign key relationships
 - Indexes for optimal query performance
 - Row Level Security (RLS) policies with descriptive names
+- Team logos and records for enhanced display
+
+**If you already have the database set up:**
+- Run `migration-add-logos-records.sql` to add the new logo and record fields
+
+**Optional - Add Test Data:**
+- Run `test-data.sql` in the SQL Editor to add sample users and games for local testing
+- This is helpful when testing outside of NFL playoff season
 
 ### 3. Configure Supabase
 
@@ -98,9 +116,30 @@ gh-pages -d .
 
 ### 7. Local Testing
 
-You can test locally using Python's HTTP server:
+Before testing locally, make sure you've completed:
+1. ✅ Created Supabase project
+2. ✅ Run the `schema.sql` script
+3. ✅ Updated `js/config.js` with your Supabase credentials
+
+#### Option 1: Quick Start Script (Easiest)
 
 ```bash
+# Make script executable (first time only)
+chmod +x start-local.sh
+
+# Run the script
+./start-local.sh
+
+# Or specify a custom port
+./start-local.sh 3000
+```
+
+#### Option 2: Python HTTP Server (Manual)
+
+```bash
+# Navigate to the project directory
+cd /path/to/nfl_playoff_picks_app
+
 # Python 3
 python3 -m http.server 8000
 
@@ -109,6 +148,63 @@ python -m SimpleHTTPServer 8000
 ```
 
 Then open `http://localhost:8000` in your browser.
+
+#### Option 3: Node.js HTTP Server
+
+If you have Node.js installed:
+
+```bash
+# Install http-server globally (one time)
+npm install -g http-server
+
+# Run the server
+http-server -p 8000
+```
+
+#### Option 4: VS Code Live Server
+
+If you use VS Code:
+1. Install the "Live Server" extension
+2. Right-click on `index.html`
+3. Select "Open with Live Server"
+
+#### Option 5: PHP Built-in Server
+
+If you have PHP installed:
+
+```bash
+php -S localhost:8000
+```
+
+#### Testing Checklist
+
+1. **Open the app**: Navigate to `http://localhost:8000`
+2. **Check console**: Open browser DevTools (F12) and check for errors
+3. **Create a user**: Fill out the sign-up form with your name
+4. **Verify Supabase connection**: Check that user appears in `nfl_playoff_users` table
+5. **Test game sync**: If it's playoff season, games should load. Otherwise, you'll see "No games available"
+6. **Test picks**: Try making a pick (if games are available)
+7. **Test leaderboard**: Switch to the leaderboard view
+
+#### Common Local Testing Issues
+
+**CORS Errors:**
+- Make sure you've added `http://localhost:8000` to Supabase CORS settings (Settings → API → CORS)
+
+**Script Loading Errors:**
+- Check that all files in the `js/` folder are present
+- Verify the file paths in `js/loader.js` are correct
+- Check browser console for 404 errors
+
+**Supabase Connection Errors:**
+- Verify your `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `js/config.js`
+- Check that RLS policies are set up correctly
+- Ensure tables exist with the `nfl_playoff_` prefix
+
+**No Games Showing:**
+- This is normal if it's not NFL playoff season
+- ESPN API only returns games during the season
+- You can manually insert test games into `nfl_playoff_games` table for testing
 
 ## How It Works
 
@@ -153,6 +249,8 @@ nfl_playoff_picks_app/
 │   ├── app.js           # Main App component
 │   └── loader.js        # Script loader (transpiles JSX)
 ├── schema.sql          # Database schema
+├── test-data.sql       # Sample data for local testing
+├── start-local.sh      # Quick start script for local testing
 └── README.md           # This file
 ```
 

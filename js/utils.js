@@ -4,77 +4,130 @@
 
 // Get user from localStorage
 const getStoredUser = () => {
-    const stored = localStorage.getItem('nfl_picks_user');
-    return stored ? JSON.parse(stored) : null;
+  const stored = localStorage.getItem("nfl_picks_user");
+  return stored ? JSON.parse(stored) : null;
 };
 
 // Store user in localStorage
 const storeUser = (user) => {
-    localStorage.setItem('nfl_picks_user', JSON.stringify(user));
+  localStorage.setItem("nfl_picks_user", JSON.stringify(user));
 };
 
 // Clear user from localStorage
 const clearStoredUser = () => {
-    localStorage.removeItem('nfl_picks_user');
+  localStorage.removeItem("nfl_picks_user");
 };
 
-// Format date/time
+// Format date/time in Eastern timezone
 const formatDateTime = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-    });
+  const date = new Date(dateString);
+  return date.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "America/New_York",
+    timeZoneName: "short",
+  });
 };
 
 // Check if game has started
 const hasGameStarted = (gameTime) => {
-    return new Date(gameTime) < new Date();
+  return new Date(gameTime) < new Date();
+};
+
+// Check if a game is a playoff/postseason game
+const isPlayoffGame = (espnData) => {
+  const type = espnData.type?.slug;
+  const seasonType = espnData.season?.type;
+  const week = espnData.week;
+  const name = espnData.name?.toLowerCase() || "";
+
+  // Check if it's postseason type
+  if (type === "postseason" || type === "3") {
+    return true;
+  }
+
+  // Check season type
+  if (seasonType === 3 || seasonType === "3") {
+    return true;
+  }
+
+  // Check week number (playoffs are typically weeks 18+)
+  if (week && week.number >= 18) {
+    // Double check it's not just a late regular season game
+    // Playoff games usually have specific naming
+    if (
+      name.includes("wild card") ||
+      name.includes("wildcard") ||
+      name.includes("divisional") ||
+      name.includes("division") ||
+      name.includes("conference") ||
+      name.includes("championship") ||
+      name.includes("super bowl") ||
+      name.includes("superbowl") ||
+      name.includes("playoff")
+    ) {
+      return true;
+    }
+  }
+
+  // Check name for playoff indicators
+  if (
+    name.includes("wild card") ||
+    name.includes("wildcard") ||
+    name.includes("divisional") ||
+    name.includes("division") ||
+    name.includes("conference") ||
+    name.includes("championship") ||
+    name.includes("super bowl") ||
+    name.includes("superbowl") ||
+    name.includes("playoff")
+  ) {
+    return true;
+  }
+
+  return false;
 };
 
 // Map ESPN playoff round to our format
 const mapPlayoffRound = (espnData) => {
-    // ESPN uses different naming, we'll need to infer from date/context
-    // Check for round information in various places
-    const league = espnData.league?.slug;
-    const type = espnData.type?.slug;
-    const week = espnData.week;
-    const name = espnData.name?.toLowerCase() || '';
-    
-    // If it's not postseason, return other
-    if (type !== 'postseason' && type !== '3') {
-        return 'other';
-    }
-    
-    // Try to detect round from name or week
-    if (name.includes('super bowl') || name.includes('superbowl')) {
-        return 'super_bowl';
-    }
-    if (name.includes('conference') || name.includes('championship')) {
-        return 'conference';
-    }
-    if (name.includes('divisional') || name.includes('division')) {
-        return 'divisional';
-    }
-    if (name.includes('wild card') || name.includes('wildcard')) {
-        return 'wild_card';
-    }
-    
-    // Fallback: use week number if available
-    // NFL playoffs typically: Wild Card (week 18-19), Divisional (week 19-20), 
-    // Conference (week 20-21), Super Bowl (week 21-22)
-    if (week) {
-        if (week.number >= 21) return 'super_bowl';
-        if (week.number >= 20) return 'conference';
-        if (week.number >= 19) return 'divisional';
-        return 'wild_card';
-    }
-    
-    // Default to wild_card for postseason games
-    return 'wild_card';
-};
+  // Check notes/headline first (most reliable)
+  const notes = espnData.competitions?.[0]?.notes || [];
+  const headline = notes.find((n) => n.type === "event")?.headline || "";
+  const headlineLower = headline.toLowerCase();
 
+  if (headlineLower.includes("super bowl")) {
+    return "super_bowl";
+  }
+  if (headlineLower.includes("conference championship")) {
+    return "conference";
+  }
+  if (headlineLower.includes("divisional")) {
+    return "divisional";
+  }
+  if (headlineLower.includes("wild card")) {
+    return "wild_card";
+  }
+
+  // Fallback: use week number
+  // Week 1 = Wild Card, Week 2 = Divisional, Week 3 = Conference, Week 5 = Super Bowl
+  const week = espnData.week?.number;
+  if (week) {
+    if (week === 5) return "super_bowl";
+    if (week === 3) return "conference";
+    if (week === 2) return "divisional";
+    if (week === 1) return "wild_card";
+  }
+
+  // Check season type
+  const seasonType = espnData.season?.type;
+  if (seasonType !== 3) {
+    return "other";
+  }
+
+  // Default to wild_card for postseason games
+  return "wild_card";
+};
