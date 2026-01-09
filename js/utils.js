@@ -19,8 +19,21 @@ const clearStoredUser = () => {
 };
 
 // Format date/time in Eastern timezone
+// ESPN API returns dates in GMT/UTC, so we ensure proper conversion
 const formatDateTime = (dateString) => {
-  const date = new Date(dateString);
+  if (!dateString) return "";
+
+  // Ensure the date string is treated as UTC
+  // If it doesn't end with 'Z' (UTC indicator) and has no timezone offset, append 'Z'
+  let dateStr = dateString;
+  if (!dateStr.endsWith("Z") && !dateStr.match(/[+-]\d{2}:?\d{2}$/)) {
+    // No timezone info, assume UTC
+    dateStr = dateStr + "Z";
+  }
+
+  const date = new Date(dateStr);
+
+  // Convert to Eastern timezone
   return date.toLocaleString("en-US", {
     weekday: "short",
     month: "short",
@@ -34,8 +47,20 @@ const formatDateTime = (dateString) => {
 };
 
 // Check if game has started
+// ESPN API returns dates in GMT/UTC
 const hasGameStarted = (gameTime) => {
-  return new Date(gameTime) < new Date();
+  if (!gameTime) return false;
+
+  // Ensure the date string is treated as UTC
+  let dateStr = gameTime;
+  if (!dateStr.endsWith("Z") && !dateStr.match(/[+-]\d{2}:?\d{2}$/)) {
+    // No timezone info, assume UTC
+    dateStr = dateStr + "Z";
+  }
+
+  const gameDate = new Date(dateStr);
+  const now = new Date();
+  return gameDate < now;
 };
 
 // Check if a game is a playoff/postseason game

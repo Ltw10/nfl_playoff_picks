@@ -458,8 +458,244 @@ const GamesList = ({
   );
 };
 
+// Leaderboard Grid View Component - Shows games with players and their picks
+const LeaderboardGridView = ({ users, games, picks, currentUser }) => {
+  // Filter to only show playoff games (exclude 'other' round)
+  const playoffGames = games.filter((game) => {
+    const round = game.playoff_round || "other";
+    return round !== "other";
+  });
+
+  // Show all playoff games (not just started ones)
+  // Group games by playoff round
+  const gamesByRound = playoffGames.reduce((acc, game) => {
+    const round = game.playoff_round || "wild_card";
+    if (!acc[round]) acc[round] = [];
+    acc[round].push(game);
+    return acc;
+  }, {});
+
+  const roundLabels = {
+    wild_card: "Wild Card Round",
+    divisional: "Divisional Round",
+    conference: "Conference Championships",
+    super_bowl: "Super Bowl",
+  };
+
+  // Get pick for a user in a game
+  const getUserPick = (userId, gameId) => {
+    return picks.find((p) => p.user_id === userId && p.game_id === gameId);
+  };
+
+  // Get team logo for a pick
+  const getTeamLogo = (game, teamAbbreviation) => {
+    if (game.home_team === teamAbbreviation) return game.home_logo;
+    if (game.away_team === teamAbbreviation) return game.away_logo;
+    return null;
+  };
+
+  // Check if a game is locked (hasn't started yet)
+  const isGameLocked = (game) => {
+    return game.status === "scheduled" && !hasGameStarted(game.game_time);
+  };
+
+  if (playoffGames.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <p className="text-gray-600">No playoff games available yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {Object.entries(gamesByRound).map(([round, roundGames]) => (
+        <div
+          key={round}
+          className="bg-white rounded-lg shadow-md overflow-hidden"
+        >
+          <div className="px-6 py-4 bg-gray-50 border-b">
+            <h3 className="text-xl font-bold text-gray-800">
+              {roundLabels[round] || round}
+            </h3>
+          </div>
+          <div className="p-6">
+            <div className="grid gap-6">
+              {roundGames.map((game) => {
+                const gameLocked = isGameLocked(game);
+                const gamePicks = users.map((user) => {
+                  const pick = getUserPick(user.id, game.id);
+                  return {
+                    user,
+                    pick: pick?.picked_team || null,
+                    logo: pick ? getTeamLogo(game, pick.picked_team) : null,
+                    isCorrect:
+                      game.status === "completed" &&
+                      pick &&
+                      pick.picked_team === game.winner,
+                    isIncorrect:
+                      game.status === "completed" &&
+                      pick &&
+                      pick.picked_team !== game.winner,
+                    hasPick: !!pick,
+                  };
+                });
+
+                return (
+                  <div
+                    key={game.id}
+                    className="border border-gray-200 rounded-lg p-4"
+                  >
+                    {/* Game Header */}
+                    <div className="mb-4 pb-4 border-b border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          {game.away_logo && (
+                            <img
+                              src={game.away_logo}
+                              alt={game.away_team}
+                              className="w-8 h-8 object-contain"
+                            />
+                          )}
+                          <span className="font-semibold text-gray-800">
+                            {game.away_team}
+                          </span>
+                          <span className="text-gray-400">@</span>
+                          {game.home_logo && (
+                            <img
+                              src={game.home_logo}
+                              alt={game.home_team}
+                              className="w-8 h-8 object-contain"
+                            />
+                          )}
+                          <span className="font-semibold text-gray-800">
+                            {game.home_team}
+                          </span>
+                        </div>
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            game.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : game.status === "in_progress"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {game.status === "completed"
+                            ? "Final"
+                            : game.status === "in_progress"
+                            ? "Live"
+                            : "Scheduled"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {formatDateTime(game.game_time)}
+                      </p>
+                    </div>
+
+                    {/* Players Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {gamePicks.map(
+                        ({
+                          user,
+                          pick,
+                          logo,
+                          isCorrect,
+                          isIncorrect,
+                          hasPick,
+                        }) => (
+                          <div
+                            key={user.id}
+                            className={`p-3 rounded border ${
+                              user.id === currentUser.id
+                                ? "bg-blue-50 border-blue-300"
+                                : "bg-gray-50 border-gray-200"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <span
+                                className={`text-sm font-medium ${
+                                  user.id === currentUser.id
+                                    ? "text-blue-700"
+                                    : "text-gray-700"
+                                }`}
+                              >
+                                {user.first_name} {user.last_name}
+                                {user.id === currentUser.id && (
+                                  <span className="ml-1 text-blue-600">
+                                    (You)
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            {gameLocked ? (
+                              // Game is locked - show lock icon if pick exists, blank if no pick
+                              hasPick ? (
+                                <div className="flex items-center justify-center">
+                                  <svg
+                                    className="w-8 h-8 text-gray-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                    />
+                                  </svg>
+                                </div>
+                              ) : (
+                                // No pick - leave blank
+                                <div className="h-8"></div>
+                              )
+                            ) : // Game is unlocked - show pick with logo
+                            pick ? (
+                              <div className="flex items-center gap-2">
+                                {logo ? (
+                                  <img
+                                    src={logo}
+                                    alt={pick}
+                                    className="w-8 h-8 object-contain"
+                                  />
+                                ) : (
+                                  <span className="text-xs text-gray-600">
+                                    {pick}
+                                  </span>
+                                )}
+                                {game.status === "completed" && (
+                                  <span className="text-sm">
+                                    {isCorrect && "✅"}
+                                    {isIncorrect && "❌"}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400">
+                                No pick
+                              </span>
+                            )}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // Leaderboard Component
 const Leaderboard = ({ users, games, picks, currentUser, onViewUser }) => {
+  const [viewMode, setViewMode] = React.useState("table"); // 'table' or 'grid'
+
   // Calculate stats for each user
   const userStats = users.map((user) => {
     const userPicks = picks.filter((p) => p.user_id === user.id);
@@ -504,82 +740,115 @@ const Leaderboard = ({ users, games, picks, currentUser, onViewUser }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="px-6 py-4 bg-gray-50 border-b">
+      <div className="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">Leaderboard</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode("table")}
+            className={`px-4 py-2 rounded font-semibold transition ${
+              viewMode === "table"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            Summary
+          </button>
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`px-4 py-2 rounded font-semibold transition ${
+              viewMode === "grid"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+          >
+            Grid View
+          </button>
+        </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Rank
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Wins
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Losses
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Total Picks
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Picks Submitted
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Win %
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {userStats.map((user, index) => (
-              <tr
-                key={user.id}
-                className={
-                  user.id === currentUser.id ? "bg-blue-50 font-semibold" : ""
-                }
-              >
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {index + 1}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {user.id === currentUser.id ? (
-                    <span className="text-blue-600 font-semibold">
-                      {user.first_name} {user.last_name}
-                      <span className="ml-2 text-blue-600">(You)</span>
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => onViewUser(user.id)}
-                      className="text-left text-blue-500 hover:text-blue-700 hover:underline"
-                    >
-                      {user.first_name} {user.last_name}
-                    </button>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
-                  {user.wins}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
-                  {user.losses}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
-                  {user.totalPicks}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
-                  {user.picksSubmitted}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
-                  {user.winPercentage}%
-                </td>
+      {viewMode === "table" ? (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Rank
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Wins
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Losses
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total Picks
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Picks Submitted
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Win %
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {userStats.map((user, index) => (
+                <tr
+                  key={user.id}
+                  className={
+                    user.id === currentUser.id ? "bg-blue-50 font-semibold" : ""
+                  }
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {index + 1}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {user.id === currentUser.id ? (
+                      <span className="text-blue-600 font-semibold">
+                        {user.first_name} {user.last_name}
+                        <span className="ml-2 text-blue-600">(You)</span>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => onViewUser(user.id)}
+                        className="text-left text-blue-500 hover:text-blue-700 hover:underline"
+                      >
+                        {user.first_name} {user.last_name}
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
+                    {user.wins}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
+                    {user.losses}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
+                    {user.totalPicks}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
+                    {user.picksSubmitted}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
+                    {user.winPercentage}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="p-6">
+          <LeaderboardGridView
+            users={users}
+            games={games}
+            picks={picks}
+            currentUser={currentUser}
+          />
+        </div>
+      )}
     </div>
   );
 };
