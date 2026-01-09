@@ -122,16 +122,16 @@ const App = () => {
             {/* Navigation */}
             <nav className="bg-white shadow-md">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center h-16">
-                        <h1 className="text-xl font-bold text-gray-800">NFL Playoff Picks</h1>
-                        <div className="flex items-center gap-4">
-                            <span className="text-gray-700">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 sm:py-0 sm:h-16 gap-3 sm:gap-0">
+                        <h1 className="text-lg sm:text-xl font-bold text-gray-800">NFL Playoff Picks</h1>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                            <span className="text-sm sm:text-base text-gray-700">
                                 {currentUser.first_name} {currentUser.last_name}
                             </span>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 <button
                                     onClick={() => setView('picks')}
-                                    className={`px-4 py-2 rounded font-semibold transition ${
+                                    className={`px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded font-semibold transition ${
                                         view === 'picks'
                                             ? 'bg-blue-500 text-white'
                                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -141,7 +141,7 @@ const App = () => {
                                 </button>
                                 <button
                                     onClick={() => setView('leaderboard')}
-                                    className={`px-4 py-2 rounded font-semibold transition ${
+                                    className={`px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base rounded font-semibold transition ${
                                         view === 'leaderboard'
                                             ? 'bg-blue-500 text-white'
                                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -152,14 +152,14 @@ const App = () => {
                                 <button
                                     onClick={fetchAllData}
                                     disabled={loading}
-                                    className="px-4 py-2 bg-green-500 text-white rounded font-semibold hover:bg-green-600 transition disabled:opacity-50"
+                                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base bg-green-500 text-white rounded font-semibold hover:bg-green-600 transition disabled:opacity-50"
                                     title="Refresh data"
                                 >
-                                    {loading ? '⏳' : '🔄'} Refresh
+                                    {loading ? '⏳' : '🔄'} <span className="hidden sm:inline">Refresh</span>
                                 </button>
                                 <button
                                     onClick={handleSignOut}
-                                    className="px-4 py-2 bg-red-500 text-white rounded font-semibold hover:bg-red-600 transition"
+                                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-sm sm:text-base bg-red-500 text-white rounded font-semibold hover:bg-red-600 transition"
                                 >
                                     Sign Out
                                 </button>
