@@ -25,6 +25,12 @@ CREATE TABLE nfl_playoff_games (
   away_logo TEXT,                   -- URL to away team logo
   home_record TEXT,                 -- Home team record (e.g., '12-5')
   away_record TEXT,                 -- Away team record (e.g., '11-6')
+  status_detail TEXT,               -- Game status detail (e.g., '12:16 - 2nd Quarter')
+  status_short_detail TEXT,          -- Short status detail (e.g., '12:16 - 2nd')
+  home_win_probability NUMERIC(5,4), -- Home team win probability (0.0000 to 1.0000)
+  away_win_probability NUMERIC(5,4), -- Away team win probability (0.0000 to 1.0000)
+  display_clock TEXT,               -- Time remaining in current period (e.g., '12:16')
+  period INTEGER,                   -- Quarter/period number (1-4 for quarters, 5+ for overtime)
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

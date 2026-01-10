@@ -99,6 +99,11 @@ const GameCard = ({ game, userPick, currentUser, onPick }) => {
   const isIncorrect =
     game.status === "completed" && userPicked && userPicked !== game.winner;
 
+  // If game has scores, treat it as in progress even if status hasn't updated yet
+  const hasScores = game.home_score > 0 || game.away_score > 0;
+  const effectiveStatus =
+    hasScores && game.status === "scheduled" ? "in_progress" : game.status;
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-4 border-l-4 border-blue-500">
       <div className="flex justify-between items-start mb-4">
@@ -153,26 +158,35 @@ const GameCard = ({ game, userPick, currentUser, onPick }) => {
         </div>
         <span
           className={`px-3 py-1 rounded-full text-xs font-semibold ${
-            game.status === "completed"
+            effectiveStatus === "completed"
               ? "bg-green-100 text-green-800"
-              : game.status === "in_progress"
+              : effectiveStatus === "in_progress"
               ? "bg-yellow-100 text-yellow-800"
               : "bg-gray-100 text-gray-800"
           }`}
         >
-          {game.status === "completed"
+          {effectiveStatus === "completed"
             ? "Final"
-            : game.status === "in_progress"
-            ? "Live"
+            : effectiveStatus === "in_progress"
+            ? game.status_short_detail || "Live"
             : "Scheduled"}
         </span>
       </div>
 
       {/* Score Display */}
-      {(game.status === "in_progress" || game.status === "completed") && (
+      {(effectiveStatus === "in_progress" ||
+        effectiveStatus === "completed") && (
         <div className="mb-4 p-3 bg-gray-50 rounded">
+          {/* Game Status (Quarter/Time) for in-progress games */}
+          {effectiveStatus === "in_progress" && game.status_detail && (
+            <div className="text-center mb-3 pb-2 border-b border-gray-300">
+              <span className="text-sm font-semibold text-gray-700">
+                {game.status_detail}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1">
               {game.away_logo && (
                 <img
                   src={game.away_logo}
@@ -180,12 +194,23 @@ const GameCard = ({ game, userPick, currentUser, onPick }) => {
                   className="w-8 h-8 object-contain"
                 />
               )}
-              <span className="font-semibold">{game.away_team}</span>
+              <div className="flex-1">
+                <span className="font-semibold">{game.away_team}</span>
+                {effectiveStatus === "in_progress" &&
+                  game.away_win_probability !== null && (
+                    <span
+                      className="ml-2 text-xs text-gray-600"
+                      title="Win Probability"
+                    >
+                      {Math.round(game.away_win_probability * 100)}% win
+                    </span>
+                  )}
+              </div>
             </div>
             <span className="text-2xl font-bold">{game.away_score}</span>
           </div>
           <div className="flex justify-between items-center mt-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1">
               {game.home_logo && (
                 <img
                   src={game.home_logo}
@@ -193,7 +218,18 @@ const GameCard = ({ game, userPick, currentUser, onPick }) => {
                   className="w-8 h-8 object-contain"
                 />
               )}
-              <span className="font-semibold">{game.home_team}</span>
+              <div className="flex-1">
+                <span className="font-semibold">{game.home_team}</span>
+                {effectiveStatus === "in_progress" &&
+                  game.home_win_probability !== null && (
+                    <span
+                      className="ml-2 text-xs text-gray-600"
+                      title="Win Probability"
+                    >
+                      {Math.round(game.home_win_probability * 100)}% win
+                    </span>
+                  )}
+              </div>
             </div>
             <span className="text-2xl font-bold">{game.home_score}</span>
           </div>
@@ -246,7 +282,9 @@ const GameCard = ({ game, userPick, currentUser, onPick }) => {
         </div>
       )}
 
-      {game.status === "scheduled" && gameStarted && (
+      {/* Show "Game Starting Soon" only if status is still "scheduled" but time has passed */}
+      {/* If status is "in_progress" or "completed", scores will be shown above instead */}
+      {effectiveStatus === "scheduled" && gameStarted && (
         <div className="text-center py-2 text-gray-600">
           Game Starting Soon - Picks Locked
         </div>
@@ -1012,7 +1050,7 @@ const UserPicksView = ({ userId, users, games, picks, onBack }) => {
                         {game.status === "completed"
                           ? "Final"
                           : game.status === "in_progress"
-                          ? "Live"
+                          ? game.status_short_detail || "Live"
                           : "Scheduled"}
                       </span>
                     </div>
@@ -1021,8 +1059,17 @@ const UserPicksView = ({ userId, users, games, picks, onBack }) => {
                     {(game.status === "in_progress" ||
                       game.status === "completed") && (
                       <div className="mb-4 p-3 bg-gray-50 rounded">
+                        {/* Game Status (Quarter/Time) for in-progress games */}
+                        {game.status === "in_progress" &&
+                          game.status_detail && (
+                            <div className="text-center mb-3 pb-2 border-b border-gray-300">
+                              <span className="text-sm font-semibold text-gray-700">
+                                {game.status_detail}
+                              </span>
+                            </div>
+                          )}
                         <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-1">
                             {game.away_logo && (
                               <img
                                 src={game.away_logo}
@@ -1030,16 +1077,30 @@ const UserPicksView = ({ userId, users, games, picks, onBack }) => {
                                 className="w-8 h-8 object-contain"
                               />
                             )}
-                            <span className="font-semibold">
-                              {game.away_team}
-                            </span>
+                            <div className="flex-1">
+                              <span className="font-semibold">
+                                {game.away_team}
+                              </span>
+                              {game.status === "in_progress" &&
+                                game.away_win_probability !== null && (
+                                  <span
+                                    className="ml-2 text-xs text-gray-600"
+                                    title="Win Probability"
+                                  >
+                                    {Math.round(
+                                      game.away_win_probability * 100
+                                    )}
+                                    % win
+                                  </span>
+                                )}
+                            </div>
                           </div>
                           <span className="text-2xl font-bold">
                             {game.away_score}
                           </span>
                         </div>
                         <div className="flex justify-between items-center mt-2">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-1">
                             {game.home_logo && (
                               <img
                                 src={game.home_logo}
@@ -1047,9 +1108,23 @@ const UserPicksView = ({ userId, users, games, picks, onBack }) => {
                                 className="w-8 h-8 object-contain"
                               />
                             )}
-                            <span className="font-semibold">
-                              {game.home_team}
-                            </span>
+                            <div className="flex-1">
+                              <span className="font-semibold">
+                                {game.home_team}
+                              </span>
+                              {game.status === "in_progress" &&
+                                game.home_win_probability !== null && (
+                                  <span
+                                    className="ml-2 text-xs text-gray-600"
+                                    title="Win Probability"
+                                  >
+                                    {Math.round(
+                                      game.home_win_probability * 100
+                                    )}
+                                    % win
+                                  </span>
+                                )}
+                            </div>
                           </div>
                           <span className="text-2xl font-bold">
                             {game.home_score}

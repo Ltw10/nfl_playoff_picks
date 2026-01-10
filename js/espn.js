@@ -12,22 +12,18 @@ const fetchESPNGames = async () => {
         const weeks = [1, 2, 3, 5];
         const allGames = [];
         
-        for (const week of weeks) {
-            const url = `${baseUrl}?year=${currentYear}&seasontype=3&week=${week}`;
-            console.log(`Fetching playoff week ${week} from:`, url);
-            
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                const events = data.events || [];
-                console.log(`Week ${week}: Found ${events.length} games`);
-                allGames.push(...events);
-            } catch (error) {
-                console.warn(`Error fetching week ${week}:`, error);
+            for (const week of weeks) {
+                const url = `${baseUrl}?year=${currentYear}&seasontype=3&week=${week}`;
+                
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    const events = data.events || [];
+                    allGames.push(...events);
+                } catch (error) {
+                    console.warn(`Error fetching week ${week}:`, error);
+                }
             }
-        }
-        
-        console.log(`Total playoff games found: ${allGames.length}`);
         return allGames;
     } catch (error) {
         console.error('Error fetching ESPN data:', error);
@@ -37,11 +33,12 @@ const fetchESPNGames = async () => {
 
 // Parse ESPN game data to our schema
 const parseESPNGame = (espnGame) => {
-    const homeTeam = espnGame.competitions[0]?.competitors?.find(c => c.homeAway === 'home');
-    const awayTeam = espnGame.competitions[0]?.competitors?.find(c => c.homeAway === 'away');
+    const competition = espnGame.competitions?.[0];
+    const homeTeam = competition?.competitors?.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors?.find(c => c.homeAway === 'away');
     
     const gameTime = espnGame.date;
-    const status = espnGame.status?.type?.name || 'scheduled';
+    const status = competition?.status?.type?.name || espnGame.status?.type?.name || 'scheduled';
     
     let gameStatus = 'scheduled';
     if (status === 'STATUS_IN_PROGRESS' || status === 'STATUS_HALFTIME') {
@@ -50,13 +47,29 @@ const parseESPNGame = (espnGame) => {
         gameStatus = 'completed';
     }
 
-    const homeScore = parseInt(homeTeam?.score || '0');
-    const awayScore = parseInt(awayTeam?.score || '0');
+    // Get scores from competitors.score (string format)
+    // Handle both string and number formats, default to 0 if invalid
+    const homeScoreValue = homeTeam?.score ?? '0';
+    const awayScoreValue = awayTeam?.score ?? '0';
+    const homeScore = isNaN(parseInt(homeScoreValue, 10)) ? 0 : parseInt(homeScoreValue, 10);
+    const awayScore = isNaN(parseInt(awayScoreValue, 10)) ? 0 : parseInt(awayScoreValue, 10);
     
     let winner = null;
     if (gameStatus === 'completed') {
         winner = homeScore > awayScore ? homeTeam?.team?.abbreviation : awayTeam?.team?.abbreviation;
     }
+
+    // Get game status detail (quarter and time) for in-progress games
+    const statusDetail = competition?.status?.type?.detail || competition?.status?.type?.shortDetail || '';
+    const statusShortDetail = competition?.status?.type?.shortDetail || '';
+    
+    // Get clock time and period for in-progress games
+    const displayClock = competition?.status?.displayClock || null; // e.g., "9:49"
+    const period = competition?.status?.period || null; // e.g., 1, 2, 3, 4
+
+    // Get win probabilities from situation.lastPlay.probability
+    const homeWinProbability = competition?.situation?.lastPlay?.probability?.homeWinPercentage || null;
+    const awayWinProbability = competition?.situation?.lastPlay?.probability?.awayWinPercentage || null;
 
     // Get team records
     const homeRecord = homeTeam?.records?.find(r => r.name === 'overall')?.summary || '';
@@ -66,23 +79,36 @@ const parseESPNGame = (espnGame) => {
     const homeLogo = homeTeam?.team?.logo || '';
     const awayLogo = awayTeam?.team?.logo || '';
 
-    return {
+    // Build game object - include all fields (migration must be run first)
+    // If migration hasn't been run, these fields will cause an error
+    // See migration-add-status-probabilities.sql
+    const gameData = {
         id: espnGame.id,
         home_team: homeTeam?.team?.abbreviation || homeTeam?.team?.displayName || 'TBD',
         away_team: awayTeam?.team?.abbreviation || awayTeam?.team?.displayName || 'TBD',
         game_time: gameTime,
-        location: espnGame.competitions[0]?.venue?.fullName || 'TBD',
+        location: competition?.venue?.fullName || 'TBD',
         status: gameStatus,
         home_score: homeScore,
         away_score: awayScore,
         winner: winner,
         playoff_round: mapPlayoffRound(espnGame),
-        // Additional data for display (stored as JSON string in DB or passed through)
+        // Additional data for display
         home_logo: homeLogo,
         away_logo: awayLogo,
         home_record: homeRecord,
-        away_record: awayRecord
+        away_record: awayRecord,
+        // Game status details for in-progress games (requires migration)
+        status_detail: statusDetail || null,
+        status_short_detail: statusShortDetail || null,
+        display_clock: displayClock, // Time remaining (e.g., "9:49")
+        period: period, // Quarter/period number (1-4)
+        // Win probabilities (requires migration)
+        home_win_probability: homeWinProbability,
+        away_win_probability: awayWinProbability
     };
+    
+    return gameData;
 };
 
 // Sync games: fetch from ESPN and update Supabase
@@ -93,15 +119,12 @@ const syncGames = async (existingGames) => {
     // Filter to only playoff games
     const playoffGames = espnGames.filter(game => isPlayoffGame(game));
     
-    console.log(`Found ${espnGames.length} total games, ${playoffGames.length} playoff games`);
-    
     for (const espnGame of playoffGames) {
         const parsedGame = parseESPNGame(espnGame);
         const existingGame = gameMap.get(parsedGame.id);
         
         // Only process if it's actually a playoff game (not 'other')
         if (parsedGame.playoff_round === 'other') {
-            console.log(`Skipping non-playoff game: ${parsedGame.away_team} @ ${parsedGame.home_team}`);
             continue;
         }
         
