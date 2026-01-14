@@ -84,7 +84,11 @@ const upsertGame = async (gameData) => {
         .select()
         .single();
     
-    if (error) throw error;
+    if (error) {
+        console.error(`Error updating database for game ${gameData.id}:`, error);
+        throw error;
+    }
+    
     return data;
 };
 

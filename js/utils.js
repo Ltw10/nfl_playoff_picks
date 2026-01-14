@@ -76,7 +76,9 @@ const isPlayoffGame = (espnData) => {
   }
 
   // Check season type
-  if (seasonType === 3 || seasonType === "3") {
+  // Handle both number and string formats, and check both espnData.season?.type and espnData.seasonType
+  const seasonTypeValue = seasonType || espnData.seasonType;
+  if (seasonTypeValue === 3 || seasonTypeValue === "3") {
     return true;
   }
 
@@ -119,6 +121,9 @@ const isPlayoffGame = (espnData) => {
 
 // Map ESPN playoff round to our format
 const mapPlayoffRound = (espnData) => {
+  const week = espnData.week?.number;
+  const seasonType = espnData.season?.type;
+  
   // Check notes/headline first (most reliable)
   const notes = espnData.competitions?.[0]?.notes || [];
   const headline = notes.find((n) => n.type === "event")?.headline || "";
@@ -139,7 +144,6 @@ const mapPlayoffRound = (espnData) => {
 
   // Fallback: use week number
   // Week 1 = Wild Card, Week 2 = Divisional, Week 3 = Conference, Week 5 = Super Bowl
-  const week = espnData.week?.number;
   if (week) {
     if (week === 5) return "super_bowl";
     if (week === 3) return "conference";
@@ -148,7 +152,6 @@ const mapPlayoffRound = (espnData) => {
   }
 
   // Check season type
-  const seasonType = espnData.season?.type;
   if (seasonType !== 3) {
     return "other";
   }
