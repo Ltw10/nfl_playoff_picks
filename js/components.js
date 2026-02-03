@@ -800,10 +800,12 @@ const Leaderboard = ({ users, games, picks, currentUser, onViewUser }) => {
   const [viewMode, setViewMode] = React.useState("table"); // 'table' or 'grid'
 
   const superBowlGame = games.find((g) => g.playoff_round === "super_bowl");
+  const superBowlStarted = superBowlGame ? hasGameStarted(superBowlGame.game_time) : false;
   const superBowlActualTotal =
     superBowlGame && superBowlGame.status === "completed"
       ? (superBowlGame.home_score || 0) + (superBowlGame.away_score || 0)
       : null;
+  const canSeeOthersTiebreaker = superBowlStarted;
 
   // Calculate stats for each user
   const userStats = users.map((user) => {
@@ -968,18 +970,30 @@ const Leaderboard = ({ users, games, picks, currentUser, onViewUser }) => {
                     {user.winPercentage}%
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
-                    {user.superBowlTotalPoints != null ? (
-                      <>
-                        {user.superBowlTotalPoints}
-                        {superBowlActualTotal != null && user.tiebreakerDiff != null && (
-                          <span className="text-gray-500 ml-1" title={`Actual: ${superBowlActualTotal}, off by ${user.tiebreakerDiff}`}>
-                            (actual {superBowlActualTotal})
+                    {(() => {
+                      const isOwn = user.id === currentUser.id;
+                      const canShow = isOwn || canSeeOthersTiebreaker;
+                      if (!canShow) {
+                        return (
+                          <span className="text-gray-400" title="Revealed when Super Bowl starts">
+                            —
                           </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
+                        );
+                      }
+                      if (user.superBowlTotalPoints != null) {
+                        return (
+                          <>
+                            {user.superBowlTotalPoints}
+                            {superBowlActualTotal != null && user.tiebreakerDiff != null && (
+                              <span className="text-gray-500 ml-1" title={`Actual: ${superBowlActualTotal}, off by ${user.tiebreakerDiff}`}>
+                                (actual {superBowlActualTotal})
+                              </span>
+                            )}
+                          </>
+                        );
+                      }
+                      return <span className="text-gray-400">—</span>;
+                    })()}
                   </td>
                 </tr>
               ))}
