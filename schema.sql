@@ -41,7 +41,9 @@ CREATE TABLE nfl_playoff_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
+  super_bowl_total_points INTEGER,  -- Tiebreaker: predicted total points in Super Bowl (closest wins)
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Create nfl_playoff_picks table
@@ -91,4 +93,10 @@ CREATE POLICY "nfl_playoff_picks_allow_all" ON nfl_playoff_picks
 ALTER TABLE nfl_playoff_games ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nfl_playoff_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE nfl_playoff_picks ENABLE ROW LEVEL SECURITY;
+
+-- ============================================
+-- MIGRATION: Add Super Bowl total points (tiebreaker)
+-- Run this if you already have nfl_playoff_users and need to add the column:
+-- ALTER TABLE nfl_playoff_users ADD COLUMN IF NOT EXISTS super_bowl_total_points INTEGER;
+-- ALTER TABLE nfl_playoff_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
 

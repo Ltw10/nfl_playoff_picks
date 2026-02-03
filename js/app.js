@@ -103,6 +103,18 @@ const App = () => {
         }
     };
 
+    const handleSaveSuperBowlTotal = async (totalPoints) => {
+        if (!currentUser) return;
+        try {
+            const updatedUser = await updateUserSuperBowlTotal(currentUser.id, totalPoints);
+            setCurrentUser(updatedUser);
+            storeUser(updatedUser);
+        } catch (error) {
+            console.error('Error saving Super Bowl total:', error);
+            throw error;
+        }
+    };
+
     const handleViewUser = (userId) => {
         setViewingUserId(userId);
         setView('userPicks');
@@ -178,6 +190,7 @@ const App = () => {
                         currentUser={currentUser}
                         onPick={handlePick}
                         onSaveRound={handleSaveRound}
+                        onSaveSuperBowlTotal={handleSaveSuperBowlTotal}
                         loading={loading}
                     />
                 ) : view === 'userPicks' ? (

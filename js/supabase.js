@@ -40,6 +40,22 @@ const findUserByName = async (firstName, lastName) => {
     return data;
 };
 
+// Update user's Super Bowl total points prediction (tiebreaker)
+const updateUserSuperBowlTotal = async (userId, totalPoints) => {
+    const { data, error } = await supabase
+        .from('nfl_playoff_users')
+        .update({
+            super_bowl_total_points: totalPoints == null ? null : parseInt(totalPoints, 10),
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+    
+    if (error) throw error;
+    return data;
+};
+
 // Get all games
 const getAllGames = async () => {
     const { data, error } = await supabase

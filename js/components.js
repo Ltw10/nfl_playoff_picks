@@ -327,11 +327,23 @@ const GamesList = ({
   currentUser,
   onPick,
   onSaveRound,
+  onSaveSuperBowlTotal,
   loading,
 }) => {
   // Track unsaved picks locally
   const [unsavedPicks, setUnsavedPicks] = React.useState(new Map());
   const [savingRounds, setSavingRounds] = React.useState(new Set());
+  // Super Bowl total points (tiebreaker): local value and save state
+  const [superBowlTotalInput, setSuperBowlTotalInput] = React.useState(
+    () => (currentUser && currentUser.super_bowl_total_points != null) ? String(currentUser.super_bowl_total_points) : ""
+  );
+  const [savingTiebreaker, setSavingTiebreaker] = React.useState(false);
+  // Keep input in sync when currentUser updates (e.g. after save)
+  React.useEffect(() => {
+    if (currentUser && currentUser.super_bowl_total_points != null) {
+      setSuperBowlTotalInput(String(currentUser.super_bowl_total_points));
+    }
+  }, [currentUser?.super_bowl_total_points]);
 
   // Merge saved picks with unsaved picks for display
   const userPicksMap = new Map(
@@ -464,6 +476,59 @@ const GamesList = ({
                 onPick={handlePick}
               />
             ))}
+            {/* Super Bowl total points tiebreaker (only for super_bowl round) */}
+            {round === "super_bowl" && onSaveSuperBowlTotal && (
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <label className="block text-sm font-semibold text-amber-900 mb-2">
+                  Total points tiebreaker
+                </label>
+                <p className="text-xs text-amber-800 mb-2">
+                  Predict the combined score (both teams) in the Super Bowl. Used to break ties on the leaderboard. Closest prediction wins.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="number"
+                    min={0}
+                    max={150}
+                    value={superBowlTotalInput}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 3);
+                      setSuperBowlTotalInput(v);
+                    }}
+                    disabled={roundGames.some((g) => hasGameStarted(g.game_time))}
+                    className="w-20 px-3 py-2 border border-amber-300 rounded focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    placeholder="e.g. 47"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const num = parseInt(superBowlTotalInput, 10);
+                      if (isNaN(num) || num < 0 || num > 150) {
+                        alert("Enter a number between 0 and 150.");
+                        return;
+                      }
+                      setSavingTiebreaker(true);
+                      try {
+                        await onSaveSuperBowlTotal(num);
+                      } catch (err) {
+                        alert("Failed to save tiebreaker. Please try again.");
+                      } finally {
+                        setSavingTiebreaker(false);
+                      }
+                    }}
+                    disabled={
+                      savingTiebreaker ||
+                      roundGames.some((g) => hasGameStarted(g.game_time)) ||
+                      superBowlTotalInput === "" ||
+                      String(currentUser?.super_bowl_total_points ?? "") === superBowlTotalInput
+                    }
+                    className="px-4 py-2 rounded font-semibold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    {savingTiebreaker ? "Saving..." : "Save tiebreaker"}
+                  </button>
+                </div>
+              </div>
+            )}
             {/* Save button for this round */}
             <div className="mt-4 flex justify-end">
               <button
@@ -734,6 +799,12 @@ const LeaderboardGridView = ({ users, games, picks, currentUser }) => {
 const Leaderboard = ({ users, games, picks, currentUser, onViewUser }) => {
   const [viewMode, setViewMode] = React.useState("table"); // 'table' or 'grid'
 
+  const superBowlGame = games.find((g) => g.playoff_round === "super_bowl");
+  const superBowlActualTotal =
+    superBowlGame && superBowlGame.status === "completed"
+      ? (superBowlGame.home_score || 0) + (superBowlGame.away_score || 0)
+      : null;
+
   // Calculate stats for each user
   const userStats = users.map((user) => {
     const userPicks = picks.filter((p) => p.user_id === user.id);
@@ -758,6 +829,12 @@ const Leaderboard = ({ users, games, picks, currentUser, onViewUser }) => {
     const winPercentage =
       totalPicks > 0 ? ((wins / totalPicks) * 100).toFixed(1) : 0;
 
+    const pred = user.super_bowl_total_points;
+    const tiebreakerDiff =
+      superBowlActualTotal != null && pred != null
+        ? Math.abs(pred - superBowlActualTotal)
+        : null;
+
     return {
       ...user,
       wins,
@@ -765,21 +842,36 @@ const Leaderboard = ({ users, games, picks, currentUser, onViewUser }) => {
       totalPicks,
       picksSubmitted,
       winPercentage: parseFloat(winPercentage),
+      superBowlTotalPoints: pred,
+      tiebreakerDiff,
     };
   });
 
-  // Sort by win percentage (desc), then total picks (desc)
+  // Sort by win percentage (desc), then total picks (desc), then tiebreaker (closest to actual)
   userStats.sort((a, b) => {
     if (b.winPercentage !== a.winPercentage) {
       return b.winPercentage - a.winPercentage;
     }
-    return b.totalPicks - a.totalPicks;
+    if (b.totalPicks !== a.totalPicks) {
+      return b.totalPicks - a.totalPicks;
+    }
+    if (superBowlActualTotal != null) {
+      const aDiff = a.tiebreakerDiff ?? Infinity;
+      const bDiff = b.tiebreakerDiff ?? Infinity;
+      return aDiff - bDiff;
+    }
+    return 0;
   });
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="px-6 py-4 bg-gray-50 border-b flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Leaderboard</h2>
+      <div className="px-6 py-4 bg-gray-50 border-b flex flex-wrap justify-between items-center gap-2">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">Leaderboard</h2>
+          {superBowlActualTotal != null && (
+            <p className="text-xs text-gray-600 mt-1">Ties broken by Super Bowl total points (closest to actual wins).</p>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => setViewMode("table")}
@@ -829,6 +921,9 @@ const Leaderboard = ({ users, games, picks, currentUser, onViewUser }) => {
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Win %
                 </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" title="Super Bowl total points (tiebreaker)">
+                  SB Total
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -871,6 +966,20 @@ const Leaderboard = ({ users, games, picks, currentUser, onViewUser }) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
                     {user.winPercentage}%
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-900">
+                    {user.superBowlTotalPoints != null ? (
+                      <>
+                        {user.superBowlTotalPoints}
+                        {superBowlActualTotal != null && user.tiebreakerDiff != null && (
+                          <span className="text-gray-500 ml-1" title={`Actual: ${superBowlActualTotal}, off by ${user.tiebreakerDiff}`}>
+                            (actual {superBowlActualTotal})
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
