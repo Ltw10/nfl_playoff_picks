@@ -37,22 +37,23 @@ A simple family competition website where you can pick NFL playoff game winners 
 
 ### 2. Set Up Database Schema
 
-1. In your Supabase project, go to the SQL Editor
-2. Run the SQL script from `schema.sql`
+1. In Supabase, go to **Settings** → **API** → **Exposed schemas** and add **`nfl_playoff`**, then save. (PostgREST only serves schemas listed here.)
+2. Open the **SQL Editor**
+3. Run `schema.sql` (creates schema `nfl_playoff` and all tables there—not in `public`)
 
-**Note:** Tables are prefixed with `nfl_playoff_` to distinguish from other projects in the same database:
-- `nfl_playoff_games` - Stores NFL playoff game information (includes team logos and records)
-- `nfl_playoff_users` - Stores user accounts for the competition
-- `nfl_playoff_picks` - Stores user picks for each game
+**Note:** All app tables live in the **`nfl_playoff`** Postgres schema and are named with an `nfl_playoff_` prefix:
 
-The schema includes:
-- All three tables with proper foreign key relationships
-- Indexes for optimal query performance
-- Row Level Security (RLS) policies with descriptive names
-- Team logos and records for enhanced display
+- `nfl_playoff.nfl_playoff_games` — NFL playoff game information (logos, records, status)
+- `nfl_playoff.nfl_playoff_users` — competition participants
+- `nfl_playoff.nfl_playoff_picks` — picks per user and game
 
-**If you already have the database set up:**
-- Run `migration-add-logos-records.sql` to add the new logo and record fields
+The script includes indexes, Row Level Security (RLS) policies, and explicit grants for the Data API.
+
+**If you already have these tables in `public` (existing data):**
+
+1. Add **`nfl_playoff`** to **Exposed schemas** (step 1 above).
+2. Run **`schema_migrate_public_to_nfl_playoff.sql`** once. This moves the three tables into `nfl_playoff` in place; rows, indexes, foreign keys, and RLS policies stay attached—no data copy.
+3. Ensure `js/config.js` uses the default schema (see below); deploy after the migration.
 
 **Optional - Add Test Data:**
 - Run `test-data.sql` in the SQL Editor to add sample users and games for local testing
@@ -63,23 +64,15 @@ The schema includes:
 1. In Supabase, go to **Settings** → **API**
 2. Copy your **Project URL** and **anon/public key**
 3. Open `js/config.js` in a text editor
-4. Find these lines:
-   ```javascript
-   const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-   const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-   ```
-5. Replace with your actual values:
-   ```javascript
-   const SUPABASE_URL = 'https://your-project-id.supabase.co';
-   const SUPABASE_ANON_KEY = 'your-anon-key-here';
-   ```
+4. Set `window.SUPABASE_URL` and `window.SUPABASE_ANON_KEY` to your project values
+5. Keep `window.SUPABASE_DB_SCHEMA` as `'nfl_playoff'` unless you rename the Postgres schema. The client passes `db: { schema: ... }` to `createClient` so all `.from(...)` calls use that schema
 
 ### 4. Row Level Security (RLS)
 
 The schema includes two options for RLS. The default (Option 2) is recommended for multi-project databases:
 
 **Option 1: Disable RLS (Simplest for single-project databases)**
-- Uncomment the `ALTER TABLE ... DISABLE ROW LEVEL SECURITY` lines in `schema.sql`
+- Uncomment the `ALTER TABLE nfl_playoff.nfl_playoff_* ... DISABLE ROW LEVEL SECURITY` lines in `schema.sql`
 
 **Option 2: Enable RLS with Permissive Policies (Default - Recommended)**
 - Uses descriptive policy names: `nfl_playoff_games_allow_all`, `nfl_playoff_users_allow_all`, `nfl_playoff_picks_allow_all`
@@ -118,8 +111,9 @@ gh-pages -d .
 
 Before testing locally, make sure you've completed:
 1. ✅ Created Supabase project
-2. ✅ Run the `schema.sql` script
-3. ✅ Updated `js/config.js` with your Supabase credentials
+2. ✅ Added **`nfl_playoff`** under **Settings → API → Exposed schemas**
+3. ✅ Run the `schema.sql` script (or the migrate script if upgrading from `public`)
+4. ✅ Updated `js/config.js` with your Supabase credentials (URL, anon key; keep `SUPABASE_DB_SCHEMA` as `nfl_playoff` unless you changed the schema name)
 
 #### Option 1: Quick Start Script (Easiest)
 
@@ -181,7 +175,7 @@ php -S localhost:8000
 1. **Open the app**: Navigate to `http://localhost:8000`
 2. **Check console**: Open browser DevTools (F12) and check for errors
 3. **Create a user**: Fill out the sign-up form with your name
-4. **Verify Supabase connection**: Check that user appears in `nfl_playoff_users` table
+4. **Verify Supabase connection**: Check that the user appears in table **`nfl_playoff.nfl_playoff_users`** (Table Editor → schema **nfl_playoff**)
 5. **Test game sync**: If it's playoff season, games should load. Otherwise, you'll see "No games available"
 6. **Test picks**: Try making a pick (if games are available)
 7. **Test leaderboard**: Switch to the leaderboard view
@@ -199,12 +193,12 @@ php -S localhost:8000
 **Supabase Connection Errors:**
 - Verify your `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `js/config.js`
 - Check that RLS policies are set up correctly
-- Ensure tables exist with the `nfl_playoff_` prefix
+- Ensure the three tables exist under schema **`nfl_playoff`** with the `nfl_playoff_` table prefix
 
 **No Games Showing:**
 - This is normal if it's not NFL playoff season
 - ESPN API only returns games during the season
-- You can manually insert test games into `nfl_playoff_games` table for testing
+- You can manually insert test games into **`nfl_playoff.nfl_playoff_games`** for testing
 
 ## How It Works
 
@@ -248,7 +242,8 @@ nfl_playoff_picks_app/
 │   ├── components.js    # React components
 │   ├── app.js           # Main App component
 │   └── loader.js        # Script loader (transpiles JSX)
-├── schema.sql          # Database schema
+├── schema.sql          # Database schema (schema nfl_playoff)
+├── schema_migrate_public_to_nfl_playoff.sql  # Move existing public tables → nfl_playoff (keeps data)
 ├── test-data.sql       # Sample data for local testing
 ├── start-local.sh      # Quick start script for local testing
 └── README.md           # This file
@@ -271,8 +266,8 @@ nfl_playoff_picks_app/
 ### Picks not saving
 
 - Verify Supabase RLS policies allow inserts/updates
-- Check that the `nfl_playoff_picks` table has the correct foreign key constraints
-- Ensure table names match (should be `nfl_playoff_*` prefixed)
+- Check that **`nfl_playoff.nfl_playoff_picks`** has the correct foreign key constraints
+- Ensure the client default schema is **`nfl_playoff`** in `js/config.js` and that **Exposed schemas** includes `nfl_playoff`
 - Look for errors in browser console
 
 ## Future Enhancements

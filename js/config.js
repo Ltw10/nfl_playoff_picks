@@ -4,8 +4,8 @@
 // SETUP INSTRUCTIONS:
 // 1. Create a free Supabase account at https://supabase.com
 // 2. Create a new project
-// 3. Run the schema.sql file in Supabase SQL Editor
-// 4. Go to Settings → API in Supabase
+// 3. Dashboard → Settings → API → Exposed schemas → add "nfl_playoff"
+// 4. Run the schema.sql file in Supabase SQL Editor
 // 5. Copy your Project URL and anon/public key
 // 6. Replace the values below:
 
@@ -16,6 +16,10 @@ if (typeof window.SUPABASE_URL === "undefined") {
 }
 if (typeof window.SUPABASE_ANON_KEY === "undefined") {
   window.SUPABASE_ANON_KEY = "sb_publishable_Led1z5rXySTKSamM5QHnFA_DOVxdT3x"; // Your anon/public key
+}
+/** Postgres schema for NFL Playoff tables (must match Supabase "Exposed schemas") */
+if (typeof window.SUPABASE_DB_SCHEMA === "undefined") {
+  window.SUPABASE_DB_SCHEMA = "nfl_playoff";
 }
 if (typeof window.ESPN_API_BASE_URL === "undefined") {
   window.ESPN_API_BASE_URL =
@@ -38,7 +42,10 @@ var ESPN_API_URL = window.ESPN_API_URL;
 if (typeof window.supabaseClient === "undefined") {
   window.supabaseClient = window.supabase.createClient(
     SUPABASE_URL,
-    SUPABASE_ANON_KEY
+    SUPABASE_ANON_KEY,
+    {
+      db: { schema: window.SUPABASE_DB_SCHEMA },
+    }
   );
 }
 var supabase = window.supabaseClient;

@@ -1,8 +1,8 @@
 // ============================================
 // SUPABASE FUNCTIONS
 // ============================================
-// Note: All table names are prefixed with 'nfl_playoff_' to distinguish
-// from other projects in the same database
+// Tables live in Postgres schema "nfl_playoff" (see window.SUPABASE_DB_SCHEMA in config.js).
+// Table names use the nfl_playoff_ prefix.
 
 // Create a new user
 const createUser = async (firstName, lastName) => {
